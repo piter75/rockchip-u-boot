@@ -173,12 +173,12 @@ int param_parse_bootdev(char **devtype, char **devnum)
 #ifdef CONFIG_DM_MMC
 		case BOOT_TYPE_EMMC:
 			*devtype = "mmc";
-			*devnum = "0";
+			*devnum = "1";
 			break;
 		case BOOT_TYPE_SD0:
 		case BOOT_TYPE_SD1:
 			*devtype = "mmc";
-			*devnum = "1";
+			*devnum = "0";
 			/*
 			 * If preloader does not pass sdupdate value, we treat it
 			 * as a unknown card and call the rkimgtest cmd to find
