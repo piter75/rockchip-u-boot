@@ -326,8 +326,8 @@ static int gpio_irq_init(void)
 			irq_install_handler(IRQ_GPIO0 + bank->id,
 			(interrupt_handler_t *)generic_gpio_handle_irq, dev);
 
-			/* default disable all gpio group interrupt */
-			irq_handler_disable(IRQ_GPIO0 + bank->id);
+			/* default enable all gpio group interrupt */
+			irq_handler_enable(IRQ_GPIO0 + bank->id);
 		}
 	}
 
