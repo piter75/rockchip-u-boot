@@ -265,7 +265,6 @@ int atags_set_tag(u32 magic, void *tagdata)
 #ifndef CONFIG_TPL_BUILD
 struct tag *atags_get_tag(u32 magic)
 {
-	u32 *hash, calc_hash, size;
 	struct tag *t;
 
 	if (!atags_is_available())
@@ -278,25 +277,8 @@ struct tag *atags_get_tag(u32 magic)
 		if (bad_magic(t->hdr.magic))
 			return NULL;
 
-		if (t->hdr.magic != magic)
-			continue;
-
-		size = t->hdr.size;
-		hash = (u32 *)((ulong)t + (size << 2) - HASH_LEN);
-		if (!*hash) {
-			debug("No hash, magic(%x)\n", magic);
+		if (t->hdr.magic == magic)
 			return t;
-		} else {
-			calc_hash = js_hash(t, (size << 2) - HASH_LEN);
-			if (calc_hash == *hash) {
-				debug("Hash okay, magic(%x)\n", magic);
-				return t;
-			} else {
-				debug("Hash bad, magic(%x), orgHash=%x, nowHash=%x\n",
-				      magic, *hash, calc_hash);
-				return NULL;
-			}
-		}
 	}
 
 	return NULL;
