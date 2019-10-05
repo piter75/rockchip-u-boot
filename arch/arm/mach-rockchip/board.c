@@ -66,90 +66,6 @@ __weak int rk_board_init(void)
 	return 0;
 }
 
-/*
- * define serialno max length, the max length is 512 Bytes
- * The remaining bytes are used to ensure that the first 512 bytes
- * are valid when executing 'env_set("serial#", value)'.
- */
-#define VENDOR_SN_MAX	513
-#define CPUID_LEN	0x10
-#define CPUID_OFF	0x07
-
-static int rockchip_set_ethaddr(void)
-{
-#ifdef CONFIG_ROCKCHIP_VENDOR_PARTITION
-	char buf[ARP_HLEN_ASCII + 1];
-	u8 ethaddr[ARP_HLEN];
-	int ret;
-
-	ret = vendor_storage_read(VENDOR_LAN_MAC_ID, ethaddr, sizeof(ethaddr));
-	if (ret > 0 && is_valid_ethaddr(ethaddr)) {
-		sprintf(buf, "%pM", ethaddr);
-		env_set("ethaddr", buf);
-	}
-#endif
-	return 0;
-}
-
-static int rockchip_set_serialno(void)
-{
-	u8 low[CPUID_LEN / 2], high[CPUID_LEN / 2];
-	u8 cpuid[CPUID_LEN] = {0};
-	char serialno_str[VENDOR_SN_MAX];
-	int ret = 0, i;
-	u64 serialno;
-
-	/* Read serial number from vendor storage part */
-	memset(serialno_str, 0, VENDOR_SN_MAX);
-
-#ifdef CONFIG_ROCKCHIP_VENDOR_PARTITION
-	ret = vendor_storage_read(VENDOR_SN_ID, serialno_str, (VENDOR_SN_MAX-1));
-	if (ret > 0) {
-		env_set("serial#", serialno_str);
-	} else {
-#endif
-#ifdef CONFIG_ROCKCHIP_EFUSE
-		struct udevice *dev;
-
-		/* retrieve the device */
-		ret = uclass_get_device_by_driver(UCLASS_MISC,
-						  DM_GET_DRIVER(rockchip_efuse),
-						  &dev);
-		if (ret) {
-			printf("%s: could not find efuse device\n", __func__);
-			return ret;
-		}
-
-		/* read the cpu_id range from the efuses */
-		ret = misc_read(dev, CPUID_OFF, &cpuid, sizeof(cpuid));
-		if (ret) {
-			printf("%s: read cpuid from efuses failed, ret=%d\n",
-			       __func__, ret);
-			return ret;
-		}
-#else
-		/* generate random cpuid */
-		for (i = 0; i < CPUID_LEN; i++)
-			cpuid[i] = (u8)(rand());
-#endif
-		/* Generate the serial number based on CPU ID */
-		for (i = 0; i < 8; i++) {
-			low[i] = cpuid[1 + (i << 1)];
-			high[i] = cpuid[i << 1];
-		}
-
-		serialno = crc32_no_comp(0, low, 8);
-		serialno |= (u64)crc32_no_comp(serialno, high, 8) << 32;
-		snprintf(serialno_str, sizeof(serialno_str), "%llx", serialno);
-
-		env_set("serial#", serialno_str);
-#ifdef CONFIG_ROCKCHIP_VENDOR_PARTITION
-	}
-#endif
-
-	return ret;
-}
-
 #if defined(CONFIG_USB_FUNCTION_FASTBOOT)
 int fb_set_reboot_flag(void)
 {
@@ -162,8 +78,6 @@ int fb_set_reboot_flag(void)
 
 int board_late_init(void)
 {
-	rockchip_set_ethaddr();
-	rockchip_set_serialno();
 #if (CONFIG_ROCKCHIP_BOOT_MODE_REG > 0)
 	setup_boot_mode();
 #endif
@@ -702,6 +616,10 @@ __weak int misc_init_r(void)
 	int ret;
 
 	ret = rockchip_cpuid_from_efuse(cpuid_offset, cpuid_length, cpuid);
+	if (ret)
+		return ret;
+
+	ret = rockchip_cpuid_from_otp(cpuid_offset, cpuid_length, cpuid);
 	if (ret)
 		return ret;
 
